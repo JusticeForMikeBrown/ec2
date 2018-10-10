@@ -6,10 +6,12 @@ import argparse
 import boto3
 from botocore.exceptions import ClientError
 from datetime import datetime
+import sys
 
 parser = argparse.ArgumentParser()
 parser.add_argument('number', help='number of ec2 instances to create')
 parser.add_argument('type', help='type of ec2 instances to create')
+parser.add_argument('os', help='operating system for ec2 instances')
 print("\nThis script creates EC2 instances - assuming key auth configured.\n")
 print("For assistance contact " + __author__ + ".\n")
 
@@ -22,7 +24,7 @@ ec2 = boto3.resource('ec2')
 client = boto3.client('ec2')
 
 # ssh public key
-key = 'id_duckd_donut'
+ssh_key = 'id_duckd_donut'
 
 
 # if absent create security group that enables ssh from world
@@ -44,15 +46,58 @@ def enable_ssh():
 enable_ssh()
 
 
+# ensure proper operating system selected
+def get_vm_os():
+
+    ami = {'amazon': 'ami-04681a1dbd79675a5',
+           'ubuntu': 'ami-0ac019f4fcb7cb7e6',
+           'rhel': 'ami-6871a115'}
+
+    global vm_os
+
+    vm_os = []
+
+    for key, value in ami.items():
+        if args.os in key:
+            vm_os.append(value)
+            return vm_os
+        else:
+            print("Invalid operating system selected")
+            sys.exit()
+
+
+get_vm_os()
+
+
+# only allow vm types defined in below list
+def get_vm_type():
+
+    types = ['t3.nano', 't3.micro', 't3.small']
+
+    global ec2_type
+
+    ec2_type = []
+    for item in types:
+        if args.type == item:
+            ec2_type.append(item)
+            return ec2_type
+        else:
+            print("Invalid EC2 type selected")
+            sys.exit()
+
+
+get_vm_type()
+
+
 # create ec2 vms
 def create_vm():
     instances = ec2.create_instances(
-      ImageId='ami-04681a1dbd79675a5',
+      ImageId=str(vm_os[0]),
       MinCount=int(1),
       MaxCount=int(args.number),
-      InstanceType=args.type,
+      InstanceType=str(ec2_type[0]),
       SecurityGroups=['ssh'],
-      KeyName=key
+      KeyName=ssh_key
     )
 
     instances
@@ -64,10 +109,11 @@ def create_vm():
     for vm in instances:
         vm.wait_until_running()
         vm.load()
-        print(vm.public_dns_name)
+        # print(vm.public_dns_name)
         vm_dns.append(vm.public_dns_name)
 
-    print("Created " + args.number + " VMs of type " + args.type)
+    print("Created " + args.number + " VMs of type "
+          + args.type + " with OS " + args.os)
 
     now = datetime.now()
 
