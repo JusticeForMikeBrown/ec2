@@ -21,7 +21,7 @@ Usage
 
 Here's how to use the script:
  
-    ```python create_vm.py number type os```
+    python create_vm.py number type os
 
 Where:
 
