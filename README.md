@@ -32,3 +32,5 @@ Where:
 TODO
 ------------
 Get type and os dynamically
+
+Perhaps add integration with [Ansible EC2 Dynamic Inventory](https://raw.github.com/ansible/ansible/devel/contrib/inventory/ec2.py)
