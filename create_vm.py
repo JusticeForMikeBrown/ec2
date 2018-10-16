@@ -1,12 +1,12 @@
 #!/usr/bin/env python
-
-__author__ = 'quackmaster@protonmail.com'
-
 import argparse
 import boto3
 from botocore.exceptions import ClientError
 from datetime import datetime
 import sys
+import paramiko
+
+__author__ = 'quackmaster@protonmail.com'
 
 parser = argparse.ArgumentParser()
 parser.add_argument('number', help='number of ec2 instances to create')
@@ -91,6 +91,9 @@ get_vm_type()
 
 # create ec2 vms
 def create_vm():
+
+    global instances
+
     instances = ec2.create_instances(
       ImageId=str(vm_os[0]),
       MinCount=int(1),
@@ -102,6 +105,13 @@ def create_vm():
 
     instances
 
+create_vm()
+
+
+def get_dns():
+
+    global vm_dns
+
     vm_dns = []
 
     # get public dns of hosts once up
@@ -112,8 +122,8 @@ def create_vm():
         # print(vm.public_dns_name)
         vm_dns.append(vm.public_dns_name)
 
-    print("Created " + args.number + " VMs of type "
-          + args.type + " with OS " + args.os)
+    print("Created " + args.number + " VMs of type " +
+          args.type + " with OS " + args.os)
 
     now = datetime.now()
 
@@ -122,8 +132,38 @@ def create_vm():
         for item in vm_dns:
             f.write("%s\n" % item)
 
+    # print(vm_dns)
 
-create_vm()
+get_dns()
+
+
+def update_known_hosts():
+
+    print("in create_vm")
+    # functions return none
+    # though create_vm() will return list of vms
+    # using this instead of global var
+    for vm in vm_dns:
+
+        print(vm)
+
+        known_hosts = '~/.ssh/known_hosts'
+        port = '22'
+
+        transport = paramiko.Transport(vm, port)
+        print("transport defined")
+        transport.connect(password=None, pkey=None)
+        print("connection created")
+        key = transport.get_remote_server_key()
+        print("key defined")
+        transport.close()
+        print("connection closed")
+        hostfile = paramiko.HostKeys(filename=known_hosts)
+        hostfile.add(hostname=vm, key=key, keytype=key.get_name())
+        hostfile.save(filename=known_hosts)
+        print(known_hosts + " updated")
+
+update_known_hosts()
 
 
 # response = client.describe_instances(Filters=[{'Name': 'instance-state-name',
