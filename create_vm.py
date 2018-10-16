@@ -5,6 +5,9 @@ from botocore.exceptions import ClientError
 from datetime import datetime
 import sys
 import paramiko
+from paramiko import ssh_exception
+# import time
+import os
 
 __author__ = 'quackmaster@protonmail.com'
 
@@ -105,6 +108,7 @@ def create_vm():
 
     instances
 
+
 create_vm()
 
 
@@ -134,34 +138,59 @@ def get_dns():
 
     # print(vm_dns)
 
+
 get_dns()
 
 
 def update_known_hosts():
 
-    print("in create_vm")
-    # functions return none
-    # though create_vm() will return list of vms
-    # using this instead of global var
+    # print("in create_vm")
+
+    # wait for sshd
+    # we can do this or just use while loop below
+    # until we get the connection
+    # time.sleep(5)
+
     for vm in vm_dns:
 
-        print(vm)
+        # print(vm)
 
-        known_hosts = '~/.ssh/known_hosts'
-        port = '22'
+        kh = os.path.expanduser(os.path.join("~", ".ssh", "known_hosts"))
 
-        transport = paramiko.Transport(vm, port)
-        print("transport defined")
-        transport.connect(password=None, pkey=None)
-        print("connection created")
-        key = transport.get_remote_server_key()
-        print("key defined")
-        transport.close()
-        print("connection closed")
-        hostfile = paramiko.HostKeys(filename=known_hosts)
-        hostfile.add(hostname=vm, key=key, keytype=key.get_name())
-        hostfile.save(filename=known_hosts)
-        print(known_hosts + " updated")
+        # we want to keep trying ssh connection
+        # until broken out of the loop
+        for v in range(5):
+            while True:
+                try:
+                    t = paramiko.Transport(vm, 22)
+                    t.connect()
+                except ssh_exception.SSHException:
+                    # this will print a lot without the above time.sleep
+                    # print("problem with ssh connection to " + vm)
+                    continue
+                else:
+                    print("ssh connection created")
+
+                try:
+                    key = t.get_remote_server_key()
+                    print("got host key")
+                except ssh_exception.SSHException:
+                    print("problem with getting host key")
+                    continue
+                else:
+                    t.close()
+                    print("ssh connection closed")
+
+                try:
+                    hostfile = paramiko.HostKeys(filename=kh)
+                except IOError:
+                    raise
+                else:
+                    hostfile.add(hostname=vm, key=key, keytype=key.get_name())
+                    hostfile.save(filename=kh)
+                    print(kh + " updated")
+                    return False
+
 
 update_known_hosts()
 
