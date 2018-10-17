@@ -3,7 +3,7 @@ EC2 VMs
 
 `create_vm.py` will deploy EC2 VM with SSH Security Group writing Public DNS entries to a file
 
-`terminate_vms.py` will remove all EC2 VMs.
+`terminate_vm.py` will remove all EC2 VMs.
 
 Requirements
 ------------
