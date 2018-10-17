@@ -34,6 +34,15 @@ Where:
     number = number of vms
     type   = type of ec2 instance
     os     = operating system
+    
+
+`terminate_vm.py`
+
+    python terminate_vm.py
+    
+Where:
+
+    terminate = positional argument that must be True - default = False
 
 TODO
 ------------
