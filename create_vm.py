@@ -8,6 +8,9 @@ import paramiko
 from paramiko import ssh_exception
 # import time
 import os
+import multiprocessing
+from joblib import Parallel, delayed
+
 
 __author__ = 'quackmaster@protonmail.com'
 
@@ -29,6 +32,8 @@ client = boto3.client('ec2')
 # ssh public key
 ssh_key = 'id_duckd_donut'
 
+# get number of cores
+num_cores = multiprocessing.cpu_count()
 
 # if absent create security group that enables ssh from world
 def enable_ssh():
@@ -127,7 +132,7 @@ def get_dns():
         vm_dns.append(vm.public_dns_name)
 
     print("Created " + args.number + " VMs of type " +
-          args.type + " with OS " + args.os)
+          args.type + " with OS " + args.os + "\n\n")
 
     now = datetime.now()
 
@@ -142,7 +147,7 @@ def get_dns():
 get_dns()
 
 
-def update_known_hosts():
+def update_kh(vm, vm_dns):
 
     # print("in create_vm")
 
@@ -151,48 +156,49 @@ def update_known_hosts():
     # until we get the connection
     # time.sleep(5)
 
-    for vm in vm_dns:
+    # for vm in vm_dns:
 
         # print(vm)
 
-        kh = os.path.expanduser(os.path.join("~", ".ssh", "known_hosts"))
+    paramiko.util.log_to_file("aws_ssh.log")
 
-        # we want to keep trying ssh connection
-        # until broken out of the loop
-        for v in range(5):
-            while True:
-                try:
-                    t = paramiko.Transport(vm, 22)
-                    t.connect()
-                except ssh_exception.SSHException:
-                    # this will print a lot without the above time.sleep
-                    # print("problem with ssh connection to " + vm)
-                    continue
-                else:
-                    print("ssh connection created")
+    kh = os.path.expanduser(os.path.join("~", ".ssh", "known_hosts"))
 
-                try:
-                    key = t.get_remote_server_key()
-                    print("got host key")
-                except ssh_exception.SSHException:
-                    print("problem with getting host key")
-                    continue
-                else:
-                    t.close()
-                    print("ssh connection closed")
+    while True:
+        try:
+            t = paramiko.Transport(vm, 22)
+            t.connect()
+        except ssh_exception.SSHException:
+            # this will print a lot without the above time.sleep
+            # print("problem with ssh connection to " + vm)
+            continue
+        else:
+            print("connected to " + vm + "\n")
 
-                try:
-                    hostfile = paramiko.HostKeys(filename=kh)
-                except IOError:
-                    raise
-                else:
-                    hostfile.add(hostname=vm, key=key, keytype=key.get_name())
-                    hostfile.save(filename=kh)
-                    print(kh + " updated")
-                    return False
+        try:
+            key = t.get_remote_server_key()
+            print("got host key from " + vm + "\n")
+        except ssh_exception.SSHException:
+            print("failed to get host key from " + vm + "\n")
+            continue
+        else:
+            t.close()
+            print("connected closed with " + vm + "\n")
+
+        try:
+            hostfile = paramiko.HostKeys(filename=kh)
+        except paramiko.hostkeys.HostKeyEntry.InvalidHostKey:
+            pass
+        else:
+            hostfile.add(hostname=vm, key=key, keytype=key.get_name())
+            hostfile.save(filename=kh)
+            print("added " + vm + " to " + kh + "\n")
+            break
 
 
-update_known_hosts()
+#  update_known_hosts()
+
+Parallel(n_jobs=num_cores)(delayed(update_kh)(vm, vm_dns) for vm in vm_dns)
 
 
 # response = client.describe_instances(Filters=[{'Name': 'instance-state-name',
